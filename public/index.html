@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Chinese Chess (Xiangqi) with AI analysis powered by Pikafish engine">
+  <title>象棋 — Chinese Chess</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1>象棋 <span class="subtitle">Chinese Chess</span></h1>
+    </header>
+    <main class="main-layout">
+      <div class="board-container">
+        <svg id="board-svg" viewBox="0 0 540 600" xmlns="http://www.w3.org/2000/svg">
+          <!-- Board will be drawn by JS -->
+        </svg>
+        <div class="turn-indicator" id="turn-indicator">
+          <span class="turn-dot red-dot"></span>
+          <span id="turn-text">Red's Turn</span>
+        </div>
+      </div>
+      <aside class="side-panel">
+        <div class="analysis-panel" id="analysis-panel">
+          <h2>🔍 Engine Analysis</h2>
+          <div class="engine-status" id="engine-status">
+            <span class="status-dot connecting"></span> Connecting...
+          </div>
+          <div class="analysis-lines" id="analysis-lines">
+            <div class="empty-analysis">Make a move to see analysis</div>
+          </div>
+        </div>
+        <div class="controls">
+          <button id="btn-undo" class="btn btn-undo" disabled>
+            <span class="btn-icon">↩</span> Undo
+          </button>
+          <button id="btn-flip" class="btn btn-flip">
+            <span class="btn-icon">⇅</span> Flip
+          </button>
+          <button id="btn-new" class="btn btn-new">
+            <span class="btn-icon">⟳</span> New Game  
+          </button>
+        </div>
+        <div class="move-history-panel">
+          <h2>📜 Move History</h2>
+          <div class="move-list" id="move-list">
+            <div class="empty-history">No moves yet</div>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+  <script src="game.js"></script>
+</body>
+</html>
