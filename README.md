@@ -1,232 +1,106 @@
-# 象棋 Xiangqi — Chinese Chess with AI
+# 象棋研习室
 
-A beautiful Chinese Chess (Xiangqi) application powered by the **Pikafish** AI engine — the strongest open-source Xiangqi engine in the world.
+面向个人学习的本地象棋工具：和皮卡鱼下棋、跟指定棋谱练习，并在对弈中持续查看红黑优劣。
 
-![Board Screenshot](docs/screenshot.png)
+![走法反馈与错题本预览](docs/study-improved.png)
 
-## ✨ Features
+## 首次安装（Windows）
 
-- 🎮 **Full Xiangqi rules** — all piece movements, check detection, flying general rule
-- 🤖 **AI Analysis** — top 3 best moves powered by Pikafish (NNUE-based engine)
-- 🏹 **Move arrows** — visual arrows showing the engine's recommended moves
-- ↩️ **Undo** — revert any move
-- 🔄 **Flip board** — play from Red or Green's perspective
-- 🏆 **Game-over detection** — checkmate and perpetual check/repetition rules
-- 🎨 **Premium dark theme** — Chinese-inspired design with glassmorphism effects
+需要 Node.js 18 或更高版本，以及皮卡鱼 Windows 引擎与对应 NNUE 权重。
 
-## 🏗️ Architecture
-
-| Layer | Technology |
-|-------|-----------|
-| Engine | [Pikafish](https://github.com/official-pikafish/Pikafish) (UCI protocol) |
-| Backend | Node.js + Express + WebSocket |
-| Frontend | Vanilla HTML/CSS/JS with SVG board |
-| Desktop | Electron (macOS/Windows/Linux) |
-
----
-
-## 🚀 Quick Start (Web)
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) 18+ installed
-- A compiled Pikafish binary for your platform
-
-### 1. Clone and install
-
-```bash
-git clone https://github.com/YOUR_USERNAME/xiangqi.git
+```powershell
+git clone https://github.com/xxzzh/xiangqi.git
 cd xiangqi
-npm install
+npm.cmd ci --omit=dev
 ```
 
-### 2. Get the Pikafish engine
+从 [Pikafish 2026-09-06 官方发布页](https://github.com/official-pikafish/Pikafish/releases/tag/Pikafish-2026-09-06) 下载发布包，解压后在项目根目录创建 `engine/`，放入 `Pikafish-Windows-x86-64-universal.exe`、`pikafish.nnue`、`Copying.txt`、`NNUE-License.md` 和 `AUTHORS`。然后按下方说明启动。
 
-You need two files in the project root:
+仓库包含应用源码、示例棋谱和测试；引擎二进制、权重、依赖目录与本机运行记录不随源码上传。
 
-- `pikafish` — the engine binary
-- `pikafish.nnue` — the neural network file
+## 打开
 
-#### macOS (Apple Silicon)
-```bash
-# Compile from source
-git clone https://github.com/official-pikafish/Pikafish.git /tmp/pikafish-src
-cd /tmp/pikafish-src/src
-make -j$(sysctl -n hw.ncpu) build ARCH=apple-silicon
-cp pikafish /path/to/xiangqi/pikafish
+完成首次安装后，双击 **`启动研习室.cmd`**，浏览器会打开 **http://127.0.0.1:3000**。
 
-# Download NNUE file
-curl -L -o /path/to/xiangqi/pikafish.nnue \
-  https://github.com/official-pikafish/Networks/raw/master/pikafish.nnue
+也可以在本目录运行：
+
+```powershell
+npm.cmd start
 ```
 
-#### macOS (Intel)
-```bash
-cd /tmp/pikafish-src/src
-make -j$(sysctl -n hw.ncpu) build ARCH=x86-64-modern
+命令行启动时用 Ctrl+C 关闭；一键启动的后台服务可通过 PowerShell 运行 `停止研习室.ps1` 关闭。
+引擎只在有棋盘页面连接时运行。关闭所有棋盘页面后，引擎进程会自动退出。
+
+## 建议的练习顺序
+
+1. 选择“引擎陪练”，先执红，计算时间用默认 1.5 秒。先想出自己的走法，再落子。
+2. 看棋盘上方的评分和局势条；它始终采用红方视角，翻转棋盘不会改变正负含义。黑方数字是同一评分的相反数。
+3. 需要帮助时打开“显示提示”，查看前三条候选走法和后续变化。
+4. 留意“这一手，带来了什么”。实战时保留你最近一手的反馈；复盘时反馈所选着法。
+5. 用“悔棋重练”退回自己走棋前；用棋谱中的着法或左右箭头逐步回看。回看会暂停 AI。
+6. 点“从这个局面继续下”会舍弃该位置之后的练习着法，从这里重新尝试；需要保留原局时先导出。
+
+## 走法反馈与错题本
+
+“这一手，带来了什么”现在会显示走法标签，并按棋盘规则说明吃子、将军、解将、兵卒过河，以及对方是否有合法着法直接吃到刚走的子。这些说明仅描述可核对的局面事实；有直接吃子的走法并不代表一定值得吃，还要检查交换后的变化。
+
+点“对照当时推荐”可查看落子前引擎计算的推荐变化。旧版本保存的局面可能没有推荐变化，可以回看上一局面重新分析补齐。
+
+- 点“收藏这一步”可保存任意值得研究的着法，不要求已有评分。
+- 走棋前后两次计算都完成、普通评分下降至少 1.50，且与当时引擎首选不同的**人类着法**会自动收录。杀棋分数、未算完的局面不会按普通分差自动分类。
+- 错题本最多保留 100 个局面，重复收藏不会增加副本；打开后可查看练习次数，并移除条目。
+- 点“重练这个局面”会恢复到落子前，隐藏候选提示，并保留完整原局。点棋盘上方“回到原局”返回；重练期间刷新页面仍能返回。
+- 评分比较和走法标签是学习参考。两次搜索可能深度不同，因此自动收录适合作为待复习提示。
+
+错题本独立保存在当前浏览器；开始新局不会清空错题。练习期间如选择新局或导入其他棋谱，会提示替换当前练习和暂存的原局。
+
+## 棋谱陪练
+
+- 内置中炮、仙人指路、飞相三条开局短线，均为合法走法演练示例，不是唯一最优变化，也未冒充名家实战。
+- 选谱后点“跟这条谱练习”。AI 在你仍按谱走时跟随谱招；偏离或走完棋谱后改用皮卡鱼计算，并显示提示。
+- 可以执红或执黑。换边不会改变当前局面，只改变哪一方由 AI 控制。
+- 导入支持坐标 PGN、含 FEN 初始局面的 PGN，以及空格分隔的中文着法。例如：
+
+```text
+炮二平五 马8进7 马二进三 车9平8
 ```
 
-#### Linux
-```bash
-cd /tmp/pikafish-src/src
-make -j$(nproc) build ARCH=x86-64-modern
-cp pikafish /path/to/xiangqi/pikafish
+或使用 `examples/中炮练习.pgn`。PGN 有嵌套变着时只取主线；非法着法会整份拒绝，不会只导入前半盘。
+目前不支持 XQF / CBR 二进制文件，请先用原工具转成文本 PGN。
+
+## 评分与规则的范围
+
+- 评分来自真实皮卡鱼搜索，不是预设数字，也不是胜率；数值按引擎 cp / 100 展示，不应直接解释为多一个兵。
+- “当前最佳”是给定计算时间内的搜索结果，不是数学证明的最优解。计算时间不是难度或等级分。
+- 前后评分差是学习参考，会随深度改变。走法说明来自规则验证，复杂战术请结合推荐变化逐步核对。
+- 走法校验包含蹩马腿、塞象眼、炮架、将帅照面、自将与无合法着法判负。
+- 三次重复局面会暂停练习，允许悔棋变招。当前版本没有完整实现不同竞赛规则中的长将长捉责任裁定，不可用作正式比赛裁判。
+- 内置棋谱是短线示例；名局学习可导入你自己的棋谱。暂不含在线名局检索服务。
+
+## 保存
+
+本局、评分记录、设置、当前训练棋谱、错题本与重练前的原局保存在当前浏览器的 localStorage。刷新后恢复，已有着法时默认暂停，避免自动落子。
+切换浏览器或清除站点数据不会保留这些记录；用“导出”保存坐标 PGN。新局、导入会提示是否替换当前练习。
+
+## 开发与验证
+
+Node.js 18+。运行 `npm.cmd ci --omit=dev` 安装网页服务依赖，不需要 Electron。
+运行 `npm.cmd test` 检验走法、导入、评分方向、走法事实、错题去重与重练返回、真实引擎流式响应、取消旧请求及多页面隔离。
+服务仅监听 `127.0.0.1`，不同页面拥有独立引擎进程，最多同时四个棋盘。
+服务器保留“初始局面 + 历史着法”发送给引擎，避免仅用当前 FEN 丢失重复局面历史。
+
+本机 `engine/` 放置：
+
+```text
+Pikafish-Windows-x86-64-universal.exe
+pikafish.nnue
+Copying.txt
+NNUE-License.md
+AUTHORS
 ```
 
-#### Windows
-```bash
-# Using MSYS2/MinGW
-cd /tmp/pikafish-src/src
-make -j build ARCH=x86-64-modern
-# Copy pikafish.exe to the project root
-```
+引擎缺失时从 [Pikafish 2026-09-06 官方发布页](https://github.com/official-pikafish/Pikafish/releases/tag/Pikafish-2026-09-06) 下载并解压相应文件。
+可用环境变量 `ENGINE_PATH` 和 `NNUE_PATH` 指定其他引擎路径。
 
-Or download a pre-built binary from the [Pikafish releases](https://github.com/official-pikafish/Pikafish/releases).
-
-### 3. Run the web server
-
-```bash
-npm start
-```
-
-Open **http://localhost:3000** in your browser.
-
----
-
-## 🖥️ Build Desktop App (Electron)
-
-### macOS
-
-```bash
-npm install
-npm run build
-# Output: dist/mac-arm64/象棋 Xiangqi.app
-
-# Launch it
-open "dist/mac-arm64/象棋 Xiangqi.app"
-```
-
-> **Note:** The build is unsigned. On first launch, right-click → Open to bypass Gatekeeper.
-
-### Windows
-
-```bash
-# On a Windows machine with Node.js installed
-npm install
-
-# Build for Windows
-npx electron-builder --win --x64
-
-# Output: dist/win-unpacked/象棋 Xiangqi.exe
-```
-
-Make sure you have:
-- `pikafish.exe` (Windows build) in the project root
-- `pikafish.nnue` in the project root
-
-Update `package.json` build config to include `.exe`:
-```json
-{
-  "build": {
-    "win": {
-      "target": "dir",
-      "icon": "docs/icon.ico"
-    },
-    "extraResources": [
-      { "from": "pikafish.exe", "to": "pikafish" },
-      { "from": "pikafish.nnue", "to": "pikafish.nnue" },
-      { "from": "public", "to": "public" }
-    ]
-  }
-}
-```
-
-Also update `server.js` to detect the platform:
-```javascript
-// In server.js, update ENGINE_PATH default:
-const isWin = process.platform === 'win32';
-const ENGINE_PATH = process.env.ENGINE_PATH || path.join(__dirname, isWin ? 'pikafish.exe' : 'pikafish');
-```
-
-### Linux
-
-```bash
-npx electron-builder --linux --x64
-# Output: dist/linux-unpacked/
-```
-
----
-
-## 📁 Project Structure
-
-```
-xiangqi/
-├── main.js          # Electron main process
-├── server.js        # Node.js backend (Express + WebSocket + Pikafish UCI)
-├── package.json     # Dependencies and build config
-├── pikafish         # Engine binary (not in repo — see setup)
-├── pikafish.nnue    # Engine neural network (not in repo — see setup)
-├── public/
-│   ├── index.html   # Main page
-│   ├── style.css    # Dark theme styling
-│   └── game.js      # Game logic, SVG board, move validation
-├── dist/            # Build output (gitignored)
-└── docs/
-    └── screenshot.png
-```
-
----
-
-## 🎮 How to Play
-
-1. **Click a piece** to select it — valid moves appear as gold dots
-2. **Click a destination** to move the piece
-3. The **engine analyzes** the position and shows the top 3 best moves
-4. Use **Undo** to take back a move
-5. Use **Flip** to rotate the board
-6. Use **New Game** to restart
-
-### Xiangqi Rules Quick Reference
-
-| Piece | Chinese | Movement |
-|-------|---------|----------|
-| General (King) | 帥/將 | One step orthogonally, stays in palace |
-| Advisor | 仕/士 | One step diagonally, stays in palace |
-| Elephant | 相/象 | Two steps diagonally, cannot cross river |
-| Horse | 馬 | L-shape (can be blocked) |
-| Chariot (Rook) | 車 | Any number of steps orthogonally |
-| Cannon | 炮/砲 | Moves like Rook, captures by jumping over one piece |
-| Soldier (Pawn) | 兵/卒 | One step forward; sideways after crossing river |
-
----
-
-## 🔧 Configuration
-
-Edit `server.js` to adjust engine settings:
-
-```javascript
-this.send('setoption name Threads value 2');   // CPU threads
-this.send('setoption name Hash value 64');      // Hash table MB
-this.send('setoption name MultiPV value 3');    // Number of best lines
-```
-
-Analysis depth can be changed:
-```javascript
-this.send('go depth 15');  // Search depth (higher = stronger but slower)
-```
-
----
-
-## 📄 License
-
-MIT License — free to use, modify, and distribute.
-
-The [Pikafish](https://github.com/official-pikafish/Pikafish) engine is licensed under GPL-3.0.
-
----
-
-## 🙏 Credits
-
-- **[Pikafish](https://github.com/official-pikafish/Pikafish)** — the strongest open-source Xiangqi engine
-- **[Electron](https://www.electronjs.org/)** — desktop app framework
-- **[Noto Serif SC](https://fonts.google.com/noto/specimen/Noto+Serif+SC)** — Chinese font by Google
+基础界面和规则来自 [vinybnb/xiangqi](https://github.com/vinybnb/xiangqi)（MIT）。
+引擎与 NNUE 的版本、来源和许可见 [THIRD_PARTY.md](THIRD_PARTY.md)。

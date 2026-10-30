@@ -7,11 +7,11 @@
     "start": "node server.js",
     "electron": "electron .",
     "build": "electron-builder --mac",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test --test-concurrency=1 tests/*.test.js"
   },
   "keywords": ["xiangqi", "chinese-chess", "pikafish"],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "commonjs",
   "dependencies": {
     "express": "^5.2.1",
