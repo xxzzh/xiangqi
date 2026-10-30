@@ -34,7 +34,7 @@ test('a checkmated side has no legal moves',()=>{
   assert.equal(g.legalMoves().length,0);
 });
 test('every bundled training line is legal',()=>{
-  const ctx={...require('../public/rules'),...require('../public/study'),XiangqiBoard:class{},window:{addEventListener(){}},document:{getElementById(){}}};vm.createContext(ctx);
+  const ctx={...require('../public/rules'),...require('../public/study'),...require('../public/lessons'),...require('../public/critical'),XiangqiBoard:class{},window:{addEventListener(){}},document:{getElementById(){}}};vm.createContext(ctx);
   vm.runInContext(fs.readFileSync(require.resolve('../public/trainer.js'),'utf8')+'\nglobalThis.books=TRAINING_BOOKS;',ctx);
   for(const book of ctx.books){const g=new XiangqiRules(book.fen);for(const move of book.moves)g.play(move);}
 });

@@ -7,7 +7,7 @@
 </head>
 <body>
 <div class="app">
-  <header class="header"><div class="brand"><span class="seal">弈</span><div><h1>象棋研习室</h1><p>落子有思，复盘有得。</p></div></div><div class="header-meta"><span class="local-badge">本地练习</span><span id="engine-status" role="status">正在连接皮卡鱼…</span></div></header>
+  <header class="header"><div class="brand"><span class="seal">弈</span><div><h1>象棋研习室</h1><p>落子有思，复盘有得。</p></div></div><div class="header-meta"><span class="local-badge">v1.1.0 · 本地练习</span><span id="engine-status" role="status">正在连接皮卡鱼…</span></div></header>
   <main class="workspace">
     <aside class="setup-column">
       <section class="panel"><div class="eyebrow">01 / 选择练习</div><h2>今天，怎么下？</h2>
@@ -15,21 +15,24 @@
         <label for="side">我执哪方</label><select id="side"><option value="w">红方 · 先行</option><option value="b">黑方 · 后行</option></select>
         <label for="think-time">每步计算时间</label><select id="think-time"><option value="500">快速 · 0.5 秒</option><option value="1500" selected>标准 · 1.5 秒</option><option value="3000">深入 · 3 秒</option></select>
         <p class="subtle">这是计算时间，不是等级分。AI 使用当前搜索所得的最佳走法。</p>
+        <label class="switch-label critical-setting"><input id="critical-enabled" type="checkbox" checked> 关键局面停下来思考</label><p class="micro">遇到关键变化，先比较候选走法；熟悉后可关闭提醒。</p>
         <button id="btn-new" class="button primary full">开始新局 <span>↗</span></button>
       </section>
-      <section class="panel"><div class="eyebrow">02 / 学一条棋谱</div><h2>从熟悉的开局开始</h2><label for="book-select">练习棋谱</label><select id="book-select"></select><p id="book-description" class="subtle"></p><button id="btn-book" class="button full">跟这条谱练习</button><button id="btn-import" class="text-button">＋ 导入自己的棋谱</button><p class="micro">内置为短线演练示例。你可以导入名局主线，练习其中任意一方。</p></section>
+      <section class="panel"><div class="eyebrow">02 / 新手开局课</div><h2>先懂目的，再熟悉走法</h2><label for="book-select">课程 / 棋谱</label><select id="book-select"></select><p id="book-description" class="subtle"></p><button id="btn-course" class="button primary full">开始讲解课程</button><button id="btn-book" class="button full secondary-action">仅跟谱练习</button><button id="btn-import" class="text-button">＋ 导入自己的棋谱</button><p class="micro">三节入门课，每节 6 回合。示例主线用于理解出子与配合，不是唯一最佳变化。</p></section>
       <div class="learning-note"><span>一局只弄懂一个问题</span><p>先想，再落子。观察评分变化；有疑问时打开提示，或退回这一步再试。</p></div>
     </aside>
     <section class="board-column" aria-label="对弈棋盘">
       <div id="practice-banner" class="practice-banner" hidden><span id="practice-label"></span><button id="btn-return-session" class="text-button">回到原局 ↗</button></div>
       <div class="board-heading"><div><span class="eyebrow" id="session-label">引擎陪练</span><h2 id="position-label">从第一步，开始积累</h2></div><span class="pill" id="turn-text">红方走棋</span></div>
       <div class="evaluation" aria-label="红黑局势评估"><div class="eval-labels"><span class="red-text">红方 <b id="red-score">—</b></span><strong id="eval-verdict">等待分析</strong><span>黑方 <b id="black-score">—</b></span></div><div class="eval-track"><div id="eval-fill"></div><span class="eval-center"></span></div><div class="eval-meta"><span>固定红方视角 · 正数红优，负数黑优</span><span id="eval-depth">计算中…</span></div></div>
+      <section id="thinking-card" class="thinking-card" aria-labelledby="thinking-title" hidden><div class="section-title"><h2 id="thinking-title">这一刻，先想一想</h2><span class="pill">暂停落子</span></div><ul id="thinking-reasons"></ul><p id="thinking-question"></p><p id="thinking-answer" class="thinking-answer" hidden></p><div class="thinking-actions"><button id="btn-think-hint" class="text-button">看思路提示</button><button id="btn-think-engine" class="text-button">查看引擎候选</button><button id="btn-think-continue" class="button primary">我想好了，继续落子</button></div></section>
       <div class="board-frame"><svg id="board-svg" viewBox="0 0 512 564" xmlns="http://www.w3.org/2000/svg" aria-label="中国象棋棋盘"></svg></div>
       <div class="board-controls"><button id="btn-undo" class="button">↶ 悔棋重练</button><button id="btn-flip" class="button">⇅ 翻转棋盘</button><button id="btn-pause" class="button">暂停陪练</button></div>
       <div id="book-status" class="book-status" role="status">引擎会自动应招，局势评分始终显示。</div>
       <div class="chart-panel"><div class="chart-title"><span>局势轨迹</span><span class="micro">上方红优 · 下方黑优 · 评分不是胜率</span></div><svg id="score-chart" viewBox="0 0 500 62" role="img" aria-label="每步局势评分曲线"></svg></div>
     </section>
     <aside class="review-column">
+      <section id="course-panel" class="panel course-panel" hidden><div class="eyebrow">开局讲解</div><div class="section-title"><h2 id="course-title"></h2><span id="course-progress" class="pill"></span></div><p id="course-goal" class="course-goal"></p><h3 id="course-next"></h3><p id="course-why" class="course-why"></p><p id="course-caution" class="micro"></p><p id="course-demo" class="course-demo" hidden></p><button id="btn-course-demo" class="text-button">看本步示范</button><button id="btn-course-rewind" class="button full" hidden>回到课程主线</button><button id="btn-course-finish" class="button primary full" hidden>从这里继续实战</button></section>
       <section class="panel coach-panel"><div class="eyebrow">03 / 看懂变化</div><div class="section-title"><h2>这一手，带来了什么</h2><span id="move-grade" class="move-grade" hidden></span></div><p id="coach-text" aria-live="polite">先独立选择一手。落子后，这里会对比走棋前后的局势变化。</p><ul id="move-facts" class="move-facts"></ul><p id="coach-reference" class="coach-reference" hidden></p><div class="coach-actions"><button id="btn-coach-reference" class="text-button" disabled>对照当时推荐</button><button id="btn-save-mistake" class="text-button" disabled>收藏这一步 ＋</button><button id="btn-retry" class="text-button" disabled>回到刚才那步再试 ↶</button></div></section>
       <section class="panel"><div class="section-title"><h2>候选走法</h2><label class="switch-label"><input id="show-hints" type="checkbox"> 显示提示</label></div><div id="analysis-lines"><p class="subtle">提示已收起。评分仍会更新，先试着找出你的计划。</p></div></section>
       <section class="panel history-panel"><div class="section-title"><h2>本局棋谱</h2><button id="btn-export" class="text-button">导出</button></div><div class="history-header"><span>回合</span><span>红方</span><span>黑方</span></div><div id="move-list" class="move-list"><p class="subtle">棋谱会随你的落子记录在这里。</p></div><div class="replay-controls"><button id="btn-first" class="icon-button" aria-label="回到开局">|‹</button><button id="btn-prev" class="icon-button" aria-label="上一步">‹</button><span id="move-count">0 / 0 手</span><button id="btn-next" class="icon-button" aria-label="下一步">›</button><button id="btn-last" class="icon-button" aria-label="回到最新局面">›|</button></div><button id="btn-continue" class="button full" hidden>从这个局面继续下</button></section>
@@ -41,5 +44,5 @@
 <div id="toast" role="status" hidden></div>
 <dialog id="import-dialog"><form method="dialog" class="dialog-header"><h2>导入棋谱</h2><button class="icon-button" aria-label="关闭">×</button></form><p class="subtle">支持坐标 PGN、带 FEN 的 PGN，以及空格分隔的中文着法。PGN 有变着时仅导入主线；暂不支持 XQF / CBR 二进制文件。</p><label for="record-file" class="button file-label">选择 .pgn / .txt 文件</label><input id="record-file" type="file" accept=".pgn,.txt" hidden><textarea id="record-text" rows="9" aria-label="棋谱文本" placeholder='炮二平五 马8进7 马二进三 车9平8'></textarea><p id="import-error" class="error-text" role="alert"></p><button id="btn-import-confirm" class="button primary full">导入并开始棋谱陪练</button></dialog>
 <dialog id="mistake-dialog"><form method="dialog" class="dialog-header"><h2>我的错题本</h2><button class="icon-button" aria-label="关闭错题本">×</button></form><p class="subtle">先回到走错之前的局面，再独立找一手。重练期间保留原局，可以随时返回。</p><div id="mistake-list" class="mistake-list"></div></dialog>
-<script src="rules.js"></script><script src="study.js"></script><script src="game.js"></script><script src="trainer.js"></script>
+<script src="rules.js"></script><script src="study.js"></script><script src="lessons.js"></script><script src="critical.js"></script><script src="game.js"></script><script src="trainer.js"></script>
 </body></html>

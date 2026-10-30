@@ -1,6 +1,6 @@
 {
   "name": "xiangqi",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Chinese Chess with Pikafish AI Engine",
   "main": "main.js",
   "scripts": {
@@ -9,7 +9,11 @@
     "build": "electron-builder --mac",
     "test": "node --test --test-concurrency=1 tests/*.test.js"
   },
-  "keywords": ["xiangqi", "chinese-chess", "pikafish"],
+  "keywords": [
+    "xiangqi",
+    "chinese-chess",
+    "pikafish"
+  ],
   "author": "",
   "license": "MIT",
   "type": "commonjs",

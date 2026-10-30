@@ -1,9 +1,5 @@
 const $ = id => document.getElementById(id);
-const TRAINING_BOOKS = [
-  {id:'cannon',title:'中炮对屏风马 · 起步',description:'练习中炮出子与屏风马应对。留意马、车的出动次序。',fen:START_FEN,moves:'h2e2 h9g7 h0g2 i9h9 i0h0 b9c7 b0c2 a9b9'.split(' ')},
-  {id:'pawn',title:'仙人指路 · 出子演练',description:'从挺兵开始，观察双方如何出马、出车。示例共 4 回合。',fen:START_FEN,moves:'c3c4 g6g5 h0g2 h9g7 b0c2 b9c7 a0b0 a9b9'.split(' ')},
-  {id:'elephant',title:'飞相开局 · 稳步展开',description:'从飞相开始建立阵形，比较它与中炮开局的不同。',fen:START_FEN,moves:'g0e2 h9g7 h0g2 b9c7 b0c2 i9h9 i0h0 c6c5'.split(' ')}
-];
+const TRAINING_BOOKS = OPENING_COURSES.map(course => ({id:course.id,title:course.title,description:course.description,fen:course.fen,moves:course.moves}));
 class XiangqiTrainer extends XiangqiBoard {
   constructor() {
     super();
@@ -12,6 +8,9 @@ class XiangqiTrainer extends XiangqiBoard {
     this.requestId=0; this.engineReady=false; this.gameOver=false; this.currentEval=null; this.lastData=null;
     this.books=[...TRAINING_BOOKS]; this.book=this.books[0];
     this.mistakes=[];this.practiceReturn=null;this.activeMistakeId=null;this.referenceIndex=null;this.hintsVisible=false;
+    this.courseId=null;this.courseFinished=false;this.courseDepartureSeen=false;this.courseProgress={};this.lessonRevealKey=null;
+    this.thinkingEnabled=true;this.thinkStop=null;this.thinkingAcknowledged=[];
+    this.loadCourseProgress();
     this.loadMistakes();
     this.restore(); this.drawBoard(); this.populateBooks(); this.bind(); this.render(); this.connectEngine();
   }
@@ -21,23 +20,25 @@ class XiangqiTrainer extends XiangqiBoard {
     $('book-select').value=this.book.id; this.describeBook();
     $('mode').value=this.mode; $('side').value=this.humanSide; $('think-time').value=String(this.ms);
     $('show-hints').checked=this.hintsVisible;
+    $('critical-enabled').checked=this.thinkingEnabled;
   }
-  describeBook() { const book=this.books.find(b=>b.id===$('book-select').value); $('book-description').textContent=book?.description||'导入的主线，可执红或执黑练习。'; }
+  describeBook() { const book=this.books.find(b=>b.id===$('book-select').value);const progress=this.courseProgress?.[book?.id];$('book-description').textContent=(book?.description||'导入的主线，可执红或执黑练习。')+(progress?` 已完成入门演练 ${progress.completions} 次。`:'');$('btn-course').disabled=!OPENING_COURSES.some(c=>c.id===book?.id); }
   bind() {
     this.svgEl.addEventListener('click',e=>this.clickBoard(e));
     $('btn-new').onclick=()=>this.startNew(false);
     $('btn-book').onclick=()=>this.startNew(true);
+    $('btn-course').onclick=()=>this.startNew(true,true);
     $('btn-undo').onclick=()=>this.undoRound(); $('btn-retry').onclick=()=>this.retryLastHuman();
     $('btn-flip').onclick=()=>{this.flipped=!this.flipped;this.drawBoard();this.renderBoard();this.renderAnalysis();};
     $('btn-pause').onclick=()=>{this.paused=!this.paused;this.cancelAnalysis();this.render();this.requestAnalysis();};
-    $('mode').onchange=()=>{this.mode=$('mode').value;this.cancelAnalysis();this.render();this.requestAnalysis();this.persist();};
-    $('side').onchange=()=>{this.humanSide=$('side').value;this.cancelAnalysis();this.render();this.requestAnalysis();this.persist();};
+    $('mode').onchange=()=>{this.mode=$('mode').value;if(this.mode!=='book')this.courseId=null;this.thinkStop=null;this.cancelAnalysis();this.render();this.requestAnalysis();this.persist();};
+    $('side').onchange=()=>{this.humanSide=$('side').value;this.thinkStop=null;this.cancelAnalysis();this.render();this.considerCritical();this.requestAnalysis();this.persist();};
     $('think-time').onchange=()=>{this.ms=Number($('think-time').value);this.cancelAnalysis();this.requestAnalysis();this.persist();};
     $('book-select').onchange=()=>this.describeBook();
-    $('show-hints').onchange=()=>{this.hintsVisible=$('show-hints').checked;this.renderAnalysis();this.persist();};
+    $('show-hints').onchange=()=>{this.hintsVisible=$('show-hints').checked;if(this.thinkStop)this.thinkStop.engineHints=this.hintsVisible;this.renderAnalysis();this.persist();};
     $('btn-first').onclick=()=>this.review(0); $('btn-prev').onclick=()=>this.review(this.cursor-1);
     $('btn-next').onclick=()=>this.review(this.cursor+1); $('btn-last').onclick=()=>this.review(this.history.length);
-    $('btn-continue').onclick=()=>{this.history=this.history.slice(0,this.cursor);this.evaluations=this.evaluations.slice(0,this.cursor+1);this.paused=false;this.cancelAnalysis();this.render();this.requestAnalysis();this.persist();};
+    $('btn-continue').onclick=()=>this.truncate(this.cursor);
     $('btn-import').onclick=()=>{$('import-error').textContent='';$('import-dialog').showModal();};
     $('record-file').onchange=async e=>{const file=e.target.files[0];if(!file)return;if(file.size>200000){$('import-error').textContent='文件太大，请使用小于 200KB 的单局文本棋谱。';return;}$('record-text').value=await file.text();};
     $('btn-import-confirm').onclick=()=>this.importRecord(); $('btn-export').onclick=()=>this.exportRecord();
@@ -45,14 +46,23 @@ class XiangqiTrainer extends XiangqiBoard {
     $('btn-coach-reference').onclick=()=>{const index=this.coachIndex();this.referenceIndex=this.referenceIndex===index?null:index;this.renderCoach();};
     $('btn-mistakes').onclick=()=>{this.renderMistakes();$('mistake-dialog').showModal();};
     $('btn-return-session').onclick=()=>this.returnToSession();
+    $('critical-enabled').onchange=()=>{this.thinkingEnabled=$('critical-enabled').checked;this.thinkStop=null;this.render();this.considerCritical(this.lastData);this.persist();};
+    $('btn-think-continue').onclick=()=>this.releaseThinking();
+    $('btn-think-hint').onclick=()=>{if(this.thinkStop){this.thinkStop.revealed=true;this.renderThinking();this.persist();}};
+    $('btn-think-engine').onclick=()=>{if(this.thinkStop)this.thinkStop.engineHints=true;this.hintsVisible=true;$('show-hints').checked=true;this.renderAnalysis();this.persist();};
+    $('btn-course-demo').onclick=()=>{const key=this.decisionKey();this.lessonRevealKey=this.lessonRevealKey===key?null:key;this.renderCourse();};
+    $('btn-course-rewind').onclick=()=>{const state=this.courseState();if(state){this.courseDepartureSeen=false;this.truncate(state.matched);}};
+    $('btn-course-finish').onclick=()=>{this.courseId=null;this.courseFinished=false;this.thinkStop=null;this.paused=false;this.mode='engine';$('mode').value='engine';this.render();this.requestAnalysis();this.persist();};
     window.addEventListener('beforeunload',()=>this.persist());
-    document.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)||$('import-dialog').open)return;if(e.key==='ArrowLeft'){e.preventDefault();this.review(this.cursor-1);}if(e.key==='ArrowRight'){e.preventDefault();this.review(this.cursor+1);}});
+    document.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)||$('import-dialog').open||$('mistake-dialog').open)return;if(e.key==='ArrowLeft'){e.preventDefault();this.review(this.cursor-1);}if(e.key==='ArrowRight'){e.preventDefault();this.review(this.cursor+1);}});
   }
-  startNew(useBook) {
+  startNew(useBook,guided=false) {
     if((this.history.length||this.practiceReturn) && !window.confirm('开始新局会替换当前练习和暂存的原局。需要保留时，请先导出本局棋谱。继续吗？')) return;
     this.cancelAnalysis();
     this.practiceReturn=null;this.activeMistakeId=null;this.referenceIndex=null;
     if(useBook) { this.book=this.books.find(b=>b.id===$('book-select').value);this.mode='book';$('mode').value='book'; }
+    this.courseId=guided&&OPENING_COURSES.some(c=>c.id===this.book.id)?this.book.id:null;
+    this.courseFinished=false;this.courseDepartureSeen=false;this.thinkStop=null;this.thinkingAcknowledged=[];this.lessonRevealKey=null;
     this.rootFen=this.mode==='book'?this.book.fen:START_FEN;
     this.history=[];this.cursor=0;this.evaluations=[];this.currentEval=null;this.lastData=null;this.paused=false;
     this.parseFEN(this.rootFen);this.render();this.requestAnalysis();this.persist();
@@ -63,13 +73,14 @@ class XiangqiTrainer extends XiangqiBoard {
     const move=this.book.moves[this.cursor];return this.legalMoves().includes(move)?move:null;
   }
   bookMessage() {
+    if(this.courseState()?.status==='complete')return '本课演练已完成。查看课程要点后，点“从这里继续实战”继续练习。';
     if(this.mode!=='book')return this.mode==='free'?'自由分析：你可以操作双方；每次落子后自动重新评估。':'引擎会自动应招，局势评分始终显示。';
     if(positionKey(this.rootFen)!==positionKey(this.book.fen)||this.history.slice(0,Math.min(this.cursor,this.book.moves.length)).some((m,i)=>m.uci!==this.book.moves[i]))return '已偏离所选棋谱，皮卡鱼接手应招。可悔棋返回原谱。';
     if(this.cursor>=this.book.moves.length)return '这条棋谱已练完，接下来由皮卡鱼继续陪练。';
     return `跟谱中 · ${this.book.title} · 第 ${this.cursor+1} / ${this.book.moves.length} 手`;
   }
   clickBoard(e) {
-    if(this.gameOver||this.cursor!==this.history.length)return;
+    if(this.gameOver||this.thinkStop||this.cursor!==this.history.length)return;
     if(this.mode!=='free'&&(this.paused||this.turn!==this.humanSide))return;
     const rect=this.svgEl.getBoundingClientRect();
     let col=Math.round(((e.clientX-rect.left)*512/rect.width-MARGIN_X)/CELL);
@@ -85,11 +96,12 @@ class XiangqiTrainer extends XiangqiBoard {
   }
   commit(uci,source) {
     if(this.cursor!==this.history.length)return;
+    if(source==='human'&&this.thinkStop){this.toast('先完成思考停点，再继续落子。');return;}
     try {
       const move=this.play(uci);move.source=source;
       this.cancelAnalysis();this.history.push(move);this.cursor++;this.lastData=null;this.currentEval=null;
       if(source==='human'&&this.activeMistakeId){const entry=this.mistakes.find(m=>m.id===this.activeMistakeId);if(entry&&this.cursor===entry.moves.length+1){entry.attempts++;entry.lastPracticedAt=Date.now();this.saveMistakes();}}
-      this.render();this.persist();if(!this.gameOver)this.requestAnalysis();
+      this.render();this.considerCritical();this.persist();if(!this.gameOver)this.requestAnalysis();
     }catch(error){this.toast(error.message);}
   }
   setPosition(index) {
@@ -98,6 +110,7 @@ class XiangqiTrainer extends XiangqiBoard {
   }
   review(index) {
     if(index<0||index>this.history.length)return;
+    this.thinkStop=null;this.lessonRevealKey=null;
     this.cancelAnalysis();this.paused=true;this.setPosition(index);this.render();if(!this.gameOver)this.requestAnalysis();
   }
   undoRound() {
@@ -111,7 +124,7 @@ class XiangqiTrainer extends XiangqiBoard {
     for(let i=this.cursor-1;i>=0;i--)if(this.history[i].source==='human'){this.truncate(i);return;}
   }
   truncate(index) {
-    this.cancelAnalysis();this.setPosition(index);this.history=this.history.slice(0,index);this.evaluations=this.evaluations.slice(0,index+1);this.paused=false;this.render();this.requestAnalysis();this.persist();
+    this.thinkStop=null;this.lessonRevealKey=null;this.cancelAnalysis();this.setPosition(index);this.history=this.history.slice(0,index);this.evaluations=this.evaluations.slice(0,index+1);this.paused=false;this.render();this.considerCritical();this.requestAnalysis();this.persist();
   }
   cancelAnalysis() {
     this.requestId++;clearTimeout(this.replyTimer);
@@ -145,7 +158,8 @@ class XiangqiTrainer extends XiangqiBoard {
     if(!msg.done)return;
     $('engine-status').textContent='● 皮卡鱼已就绪';
     if(line){this.evaluations[this.cursor]=this.currentEval;this.captureMistakes();this.renderCoach();this.renderChart();this.renderHistory();this.persist();}
-    if(this.paused||this.mode==='free'||this.turn===this.humanSide||this.cursor!==this.history.length||this.gameOver)return;
+    this.considerCritical(msg.data);
+    if(this.paused||this.thinkStop||this.mode==='free'||this.turn===this.humanSide||this.cursor!==this.history.length||this.gameOver)return;
     const bookMove=this.bookMove(), move=bookMove||msg.data.bestmove;
     if(!move||move==='(none)'||move==='0000'){this.paused=true;this.render();this.toast('引擎没有给出可走着法，请检查终局或重复局面。');return;}
     this.replyTimer=setTimeout(()=>{if(msg.id===this.requestId&&!this.paused&&msg.fen===this.toFEN())this.commit(move,bookMove?'book':'engine');},350);
@@ -170,17 +184,18 @@ class XiangqiTrainer extends XiangqiBoard {
     return count>=3?'重复局面 · 练习暂停，请变招':'';
   }
   render() {
+    this.syncCourseCompletion();
     const outcome=this.outcome();this.gameOver=Boolean(outcome);
     $('position-label').textContent=outcome||(this.cursor!==this.history.length?'回看这一刻的选择':this.cursor?`第 ${Math.floor(this.cursor/2)+1} 回合 · ${this.turn==='w'?'红':'黑'}方行棋`:'从第一步，开始积累');
-    $('session-label').textContent=this.mode==='book'?'棋谱陪练':this.mode==='free'?'自由分析':'引擎陪练';
+    $('session-label').textContent=this.courseId?'讲解课程':this.mode==='book'?'棋谱陪练':this.mode==='free'?'自由分析':'引擎陪练';
     const checking=!this.gameOver&&this.isKingExposed(this.turn==='w'?'K':'k');
-    $('turn-text').textContent=this.gameOver?'已暂停':this.paused?'复盘 / 已暂停':`${this.turn==='w'?'红':'黑'}方${checking?'被将军':'走棋'}`;
-    $('btn-pause').textContent=this.paused?'继续陪练':'暂停陪练';$('btn-pause').disabled=this.gameOver||this.cursor!==this.history.length;
+    $('turn-text').textContent=this.gameOver?'已暂停':this.thinkStop?'思考停点':this.paused?'复盘 / 已暂停':`${this.turn==='w'?'红':'黑'}方${checking?'被将军':'走棋'}`;
+    $('btn-pause').textContent=this.paused?'继续陪练':'暂停陪练';$('btn-pause').disabled=this.gameOver||Boolean(this.thinkStop)||this.cursor!==this.history.length||this.courseState()?.status==='complete';
     $('btn-undo').disabled=this.cursor===0;$('btn-retry').disabled=!this.history.slice(0,this.cursor).some(m=>m.source==='human');
     $('btn-continue').hidden=this.cursor===this.history.length;$('book-status').textContent=this.bookMessage();
     $('practice-banner').hidden=!this.practiceReturn;
     $('practice-label').textContent=this.activeMistakeId?'错题重练 · 先独立尝试，再对照推荐走法':'';
-    this.renderBoard();this.renderEvaluation();this.renderCoach();this.renderHistory();this.renderAnalysis();this.renderChart();this.renderMistakeSummary();
+    this.renderBoard();this.renderEvaluation();this.renderCoach();this.renderHistory();this.renderAnalysis();this.renderChart();this.renderMistakeSummary();this.renderCourse();this.renderThinking();
   }
   scoreText(e,side=1) {
     if(!e)return '—';const n=e.value*side;
@@ -203,6 +218,7 @@ class XiangqiTrainer extends XiangqiBoard {
   }
   renderAnalysis() {
     const el=$('analysis-lines');el.replaceChildren();this.arrowGroup.replaceChildren();
+    if(this.thinkStop&&!this.thinkStop.engineHints){const p=document.createElement('p');p.className='subtle';p.textContent='已进入思考停点。先比较自己的候选走法，需要时再主动查看引擎建议。';el.appendChild(p);return;}
     if(!$('show-hints').checked){const p=document.createElement('p');p.className='subtle';p.textContent='提示已收起。评分仍会更新，先试着找出你的计划。';el.appendChild(p);return;}
     if(!this.lastData?.lines?.length){el.textContent='等待引擎给出候选走法…';return;}
     for(const [i,line] of this.lastData.lines.entries()){
@@ -279,6 +295,7 @@ class XiangqiTrainer extends XiangqiBoard {
       if((this.history.length||this.practiceReturn)&&!window.confirm('导入会替换当前练习和暂存的原局。需要保留时请先导出。继续吗？'))return;
       this.cancelAnalysis();this.book={...parsed,id:'custom',description:`自选棋谱 · ${parsed.moves.length} 手${parsed.hasVariations?' · 已仅提取主线':''}`};
       this.practiceReturn=null;this.activeMistakeId=null;this.referenceIndex=null;
+      this.courseId=null;this.courseFinished=false;this.courseDepartureSeen=false;this.thinkStop=null;this.thinkingAcknowledged=[];this.lessonRevealKey=null;
       this.books=this.books.filter(b=>b.id!=='custom');this.books.push(this.book);this.mode='book';this.rootFen=parsed.fen;
       this.history=[];this.cursor=0;this.evaluations=[];this.currentEval=null;this.lastData=null;this.paused=false;this.parseFEN(parsed.fen);
       this.populateBooks();this.render();this.requestAnalysis();this.persist();$('import-dialog').close();this.toast(parsed.hasVariations?'已导入主线；变着未导入。':'棋谱已导入，开始跟谱练习。');
@@ -289,6 +306,62 @@ class XiangqiTrainer extends XiangqiBoard {
     const movetext=this.history.map((m,i)=>{const round=Math.floor((i+offset)/2)+1;return `${isRed(m.piece)?round+'. ':i===0?round+'... ':''}${m.uci}`;}).join(' ');
     const rows=['[Event "象棋研习室练习"]',`[FEN "${this.rootFen}"]`,'[Result "*"]','',movetext+' *'];
     const url=URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/plain;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='象棋研习室-'+new Date().toISOString().slice(0,10)+'.pgn';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  courseState() { return this.courseId&&this.mode==='book'?coursePosition(this.courseId,this.rootFen,this.history,this.cursor):null; }
+  decisionKey() { return decisionKey(this.toFEN(),this.cursor,this.humanSide); }
+  loadCourseProgress() {
+    try{const saved=JSON.parse(localStorage.getItem('xiangqi-courses-v1'));for(const course of OPENING_COURSES){const item=saved?.[course.id];if(Number.isSafeInteger(item?.completions)&&item.completions>0&&item.completions<=100000)this.courseProgress[course.id]={completions:item.completions,completedAt:Number.isFinite(item.completedAt)?item.completedAt:null};}}catch{}
+  }
+  syncCourseCompletion() {
+    const state=this.courseState();if(state?.status!=='complete')return;
+    this.paused=true;this.thinkStop=null;
+    if(this.courseFinished)return;
+    this.courseFinished=true;
+    this.courseProgress[state.course.id]={completions:(this.courseProgress[state.course.id]?.completions||0)+1,completedAt:Date.now()};
+    try{localStorage.setItem('xiangqi-courses-v1',JSON.stringify(this.courseProgress));}catch{this.toast('课程已完成；浏览器未能保存完成记录。');}
+    this.describeBook();
+  }
+  considerCritical(analysis=null) {
+    if(!this.thinkingEnabled||this.paused||this.gameOver||this.mode==='free'||this.turn!==this.humanSide||this.cursor!==this.history.length||this.thinkStop)return false;
+    const key=this.decisionKey();if((this.thinkingAcknowledged||[]).includes(key))return false;
+    const course=this.courseState();
+    const stop=criticalPosition({fen:this.toFEN(),humanSide:this.humanSide,lastMove:this.history[this.cursor-1],course,departureSeen:this.courseDepartureSeen,analysis});
+    if(!stop)return false;
+    this.thinkStop={...stop,key,revealed:false,engineHints:false};
+    if(course?.status==='deviated')this.courseDepartureSeen=true;
+    this.hintsVisible=false;$('show-hints').checked=false;this.clearSelection();
+    this.render();this.persist();return true;
+  }
+  releaseThinking() {
+    if(!this.thinkStop)return;
+    this.thinkingAcknowledged=[...(this.thinkingAcknowledged||[]),this.thinkStop.key].slice(-100);
+    this.thinkStop=null;
+    if(this.cursor===this.history.length&&this.courseState()?.status!=='complete')this.paused=false;
+    this.render();this.requestAnalysis();this.persist();
+  }
+  renderThinking() {
+    const stop=this.thinkStop;$('thinking-card').hidden=!stop;
+    document.querySelector('.board-frame').classList.toggle('thinking-locked',Boolean(stop));
+    if(!stop)return;
+    const reasons=stop.reasons.map(reason=>{const li=document.createElement('li');li.textContent=reason;return li;});
+    $('thinking-reasons').replaceChildren(...reasons);$('thinking-question').textContent=stop.question;
+    $('thinking-answer').hidden=!stop.revealed;$('thinking-answer').textContent=stop.answer;
+    $('btn-think-hint').disabled=stop.revealed;
+  }
+  renderCourse() {
+    const state=this.courseState();$('course-panel').hidden=!state;if(!state)return;
+    const {course,status}=state;
+    $('course-title').textContent=course.title;
+    $('course-progress').textContent=`${Math.min(this.cursor,course.moves.length)} / ${course.moves.length} 手`;
+    $('course-goal').textContent=this.humanSide==='w'?`你执红：${course.redGoal}`:`你执黑：${course.blackGoal}`;
+    $('course-next').textContent=status==='complete'?'本课已完成':status==='deviated'?'已经变招，先重新判断双方威胁':`本步目标：${state.next.title}`;
+    const recent=status==='deviated'?[]:course.steps.slice(Math.max(0,this.cursor-2),Math.min(this.cursor,course.steps.length));
+    $('course-why').textContent=status==='complete'?course.summary:status==='deviated'?'变招也可能是好棋。引擎会接手应招；你可以研究新局面，也可以退回课程主线。':recent.length?recent.map((note,i)=>`${(this.cursor-recent.length+i)%2===0?'红方':'黑方'}：${note.why}`).join('\n'):'每走一步，先检查对方威胁，再完成出子目标。下方讲解会随双方落子更新。';
+    $('course-caution').textContent=status==='following'?(state.previous?.avoid||'先理解目的，再逐步熟悉走法；对方不必照着这条示例主线应招。'):status==='deviated'?'可以继续研究变招，或返回偏离前的课程位置。返回会舍弃后续着法，需要保留时先导出。':'完成演练不代表已经掌握全部变化；再换一方练习，或从这里继续实战。';
+    $('btn-course-demo').hidden=status!=='following';$('btn-course-rewind').hidden=status!=='deviated';$('btn-course-finish').hidden=status!=='complete';
+    const reveal=status==='following'&&this.lessonRevealKey===this.decisionKey();
+    $('course-demo').hidden=!reveal;$('btn-course-demo').textContent=reveal?'收起本步示范':'看本步示范';
+    if(reveal){const g=new XiangqiRules(this.toFEN());$('course-demo').textContent=`示范：${g.notation(state.next.move)}。${state.next.why}`;}
   }
   loadMistakes() {
     try {
@@ -338,7 +411,7 @@ class XiangqiTrainer extends XiangqiBoard {
     const saved=this.practiceReturn||this.sessionData();
     const evaluations=[];evaluations[entry.moves.length]=entry.before;
     this.cancelAnalysis();
-    this.applySession({rootFen:entry.rootFen,moves:entry.moves.map(uci=>({uci,source:'record'})),evaluations,mode:'engine',humanSide:g.turn,ms:this.ms,book:this.book,flipped:this.flipped,paused:false,hintsVisible:false});
+    this.applySession({rootFen:entry.rootFen,moves:entry.moves.map(uci=>({uci,source:'record'})),evaluations,mode:'engine',humanSide:g.turn,ms:this.ms,book:this.book,flipped:this.flipped,paused:false,hintsVisible:false,thinkingEnabled:this.thinkingEnabled});
     this.practiceReturn=saved;this.activeMistakeId=id;this.referenceIndex=null;
     this.drawBoard();this.populateBooks();this.render();this.requestAnalysis();this.persist();$('mistake-dialog').close();
   }
@@ -350,7 +423,7 @@ class XiangqiTrainer extends XiangqiBoard {
     }catch(error){this.toast('原局恢复失败：'+error.message);}
   }
   sessionData() {
-    return {rootFen:this.rootFen,moves:this.history.map(m=>({uci:m.uci,source:m.source})),evaluations:this.evaluations,mode:this.mode,humanSide:this.humanSide,ms:this.ms,book:this.book,cursor:this.cursor,paused:this.paused,flipped:this.flipped,hintsVisible:this.hintsVisible};
+    return {rootFen:this.rootFen,moves:this.history.map(m=>({uci:m.uci,source:m.source})),evaluations:this.evaluations,mode:this.mode,humanSide:this.humanSide,ms:this.ms,book:this.book,cursor:this.cursor,paused:this.paused,flipped:this.flipped,hintsVisible:this.hintsVisible,courseId:this.courseId,courseFinished:this.courseFinished,courseDepartureSeen:this.courseDepartureSeen,thinkingEnabled:this.thinkingEnabled,thinkStop:this.thinkStop,thinkingAcknowledged:this.thinkingAcknowledged};
   }
   persist() {
     try {localStorage.setItem('xiangqi-study-v1',JSON.stringify({...this.sessionData(),practiceReturn:this.practiceReturn,activeMistakeId:this.activeMistakeId}));}
@@ -379,6 +452,12 @@ class XiangqiTrainer extends XiangqiBoard {
     this.currentEval=this.evaluations[cursor]||null;this.lastData=null;
     this.mode=['engine','book','free'].includes(data.mode)?data.mode:'engine';this.humanSide=data.humanSide==='b'?'b':'w';this.ms=[500,1500,3000].includes(data.ms)?data.ms:1500;
     this.paused=Boolean(data.paused);this.flipped=Boolean(data.flipped);this.hintsVisible=Boolean(data.hintsVisible);
+    this.courseId=this.mode==='book'&&OPENING_COURSES.some(c=>c.id===data.courseId&&c.id===this.book.id&&positionKey(c.fen)===positionKey(data.rootFen))?data.courseId:null;
+    this.courseFinished=Boolean(data.courseFinished);this.courseDepartureSeen=Boolean(data.courseDepartureSeen);this.lessonRevealKey=null;
+    this.thinkingEnabled=data.thinkingEnabled!==false;
+    this.thinkingAcknowledged=Array.isArray(data.thinkingAcknowledged)?data.thinkingAcknowledged.filter(k=>typeof k==='string'&&k.length<300).slice(-100):[];
+    const stop=data.thinkStop;
+    this.thinkStop=this.thinkingEnabled&&stop?.key===this.decisionKey()&&Array.isArray(stop.reasons)&&typeof stop.question==='string'&&typeof stop.answer==='string'?{key:stop.key,reasons:stop.reasons.filter(s=>typeof s==='string').slice(0,8),question:stop.question.slice(0,500),answer:stop.answer.slice(0,1000),revealed:Boolean(stop.revealed),engineHints:Boolean(stop.engineHints)}:null;
   }
 }
 window.addEventListener('DOMContentLoaded',()=>{window.game=new XiangqiTrainer();});
