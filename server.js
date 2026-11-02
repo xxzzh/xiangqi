@@ -4,6 +4,9 @@ const { spawn } = require('node:child_process');
 const path = require('node:path');
 const http = require('node:http');
 const fs = require('node:fs');
+const { createHash } = require('node:crypto');
+const version = require('./package.json').version;
+const instanceId = createHash('sha256').update(fs.realpathSync(__dirname).replace(/[\\/]+$/, '').toLowerCase()).digest('hex').slice(0, 16);
 const { XiangqiRules, START_FEN } = require('./public/rules');
 const ENGINE_PATH = process.env.ENGINE_PATH || path.join(__dirname, 'engine', process.platform === 'win32' ? 'Pikafish-Windows-x86-64-universal.exe' : 'pikafish');
 const NNUE_PATH = process.env.NNUE_PATH || path.join(__dirname, 'engine', 'pikafish.nnue');
@@ -86,7 +89,7 @@ function validateRequest(msg) {
   return { id: msg.id, fen, moves: msg.moves, ms: msg.ms, currentFen: game.toFEN() };
 }
 const app = express(); app.disable('x-powered-by');
-app.get('/api/health', (_req,res) => res.json({ app: 'xiangqi-study', ok: true, engineInstalled: fs.existsSync(ENGINE_PATH) && fs.existsSync(NNUE_PATH) }));
+app.get('/api/health', (_req,res) => res.json({ app: 'xiangqi-study', ok: true, version, instanceId, engineInstalled: fs.existsSync(ENGINE_PATH) && fs.existsSync(NNUE_PATH) }));
 app.use(express.static(process.env.PUBLIC_PATH || path.join(__dirname, 'public')));
 const server = http.createServer(app), engines = new Set();
 const wss = new WebSocketServer({ server, maxPayload: 32768, verifyClient: ({req}) => !req.headers.origin || req.headers.origin === `http://${req.headers.host}` });

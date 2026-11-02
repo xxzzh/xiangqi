@@ -33,3 +33,5 @@ engine/
 .codegraph/
 .cursor/
 .runtime/
+runtime/
+portable.json

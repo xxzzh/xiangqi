@@ -24,6 +24,7 @@ test('stream throttling always delivers the complete final analysis',()=>{
 });
 test('real Pikafish streams evaluation, replaces stale searches and isolates two boards',{timeout:40000},async()=>{
   const port=await startServer(0);started=true;
+  const health=await (await fetch(`http://127.0.0.1:${port}/api/health`)).json();assert.equal(health.version,require('../package.json').version);assert.match(health.instanceId,/^[a-f0-9]{16}$/);
   const ws=new WebSocket(`ws://127.0.0.1:${port}`);
   await waitMessage(ws,m=>m.type==='status'&&m.ready);
   const first=waitMessage(ws,m=>m.type==='analysis'&&m.id===1&&!m.done);

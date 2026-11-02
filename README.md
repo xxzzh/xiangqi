@@ -2,13 +2,29 @@
 
 面向个人学习的本地象棋工具：和皮卡鱼下棋、跟开局课程理解每步目的、在关键局面停下来思考，并在对弈中持续查看红黑优劣。
 
-当前版本 **v1.1.0**，下载与版本说明见 [Releases](https://github.com/xxzzh/xiangqi/releases)。
+当前版本 **v1.2.0**，提供 Windows 免安装整合包，下载与版本说明见 [Releases](https://github.com/xxzzh/xiangqi/releases)。
 
-![开局讲解与关键局面思考停点](docs/opening-course-v1.1.0.png)
+![Windows 整合包中的课程与思考停点](docs/windows-portable-v1.2.0.png)
 
 ## 首次安装（Windows）
 
-需要 Node.js 18 或更高版本，以及皮卡鱼 Windows 引擎与对应 NNUE 权重。
+普通用户请选择 **[xiangqi-study-v1.2.0-windows-x64.zip](https://github.com/xxzzh/xiangqi/releases/download/v1.2.0/xiangqi-study-v1.2.0-windows-x64.zip)**，不要选 GitHub 自动生成的 Source code。
+
+1. 将整个 ZIP 解压到“文档”、桌面等自己有写入权限的位置。
+2. 双击 **`启动研习室.cmd`**，浏览器会自动打开本地棋盘。
+3. 选择课程并点击“开始讲解课程”，或选择引擎陪练。
+
+面向 **Windows 10/11 x64（Intel/AMD 64 位）**，无需管理员权限，无需安装 Node.js、npm 或单独下载引擎，首次启动也无需联网。训练页面需要本机已有的现代浏览器。32 位 Windows 和原生 ARM64 不适用此包。
+
+双击 **`停止研习室.cmd`** 完全结束本目录后台服务。重复启动会复用本目录的服务；端口被别的软件或别的副本占用时，会选择附近空闲端口，不会停止其他程序。
+
+学习记录保存在浏览器和本地网址对应的存储中，换浏览器、端口或清除站点数据可能看不到原记录。升级前先导出重要 PGN、停止旧版，再完整解压新版；尽量使用同一浏览器和网址。整合包内的 `开始使用.txt` 提供使用说明与常见问题。
+
+整合包附带官方皮卡鱼与 NNUE，其独立许可条款、作者信息、对应引擎源码及 Node.js/依赖许可均已保留，详见 [THIRD_PARTY.md](THIRD_PARTY.md)。
+
+## 源码运行（开发者）
+
+源码 ZIP 与仓库克隆仍需 Node.js 18 或更高版本，以及皮卡鱼 Windows 引擎与对应 NNUE 权重；建议使用当前受支持的 Node.js LTS。
 
 ```powershell
 git clone https://github.com/xxzzh/xiangqi.git
@@ -18,11 +34,11 @@ npm.cmd ci --omit=dev
 
 从 [Pikafish 2026-09-06 官方发布页](https://github.com/official-pikafish/Pikafish/releases/tag/Pikafish-2026-09-06) 下载发布包，解压后在项目根目录创建 `engine/`，放入 `Pikafish-Windows-x86-64-universal.exe`、`pikafish.nnue`、`Copying.txt`、`NNUE-License.md` 和 `AUTHORS`。然后按下方说明启动。
 
-仓库包含应用源码、示例棋谱和测试；引擎二进制、权重、依赖目录与本机运行记录不随源码上传。
+Git 仓库和源码 ZIP 包含应用源码、示例棋谱和测试；引擎、权重与运行环境通过 Release 的 Windows 整合包单独分发，本机运行记录不上传。
 
 ## 打开
 
-完成首次安装后，双击 **`启动研习室.cmd`**，浏览器会打开 **http://127.0.0.1:3000**。
+完成安装或解压后，双击 **`启动研习室.cmd`**，浏览器会打开本地棋盘，默认地址 **http://127.0.0.1:3000**。端口冲突时以启动窗口显示的网址为准。
 
 也可以在本目录运行：
 
@@ -30,7 +46,7 @@ npm.cmd ci --omit=dev
 npm.cmd start
 ```
 
-命令行启动时用 Ctrl+C 关闭；一键启动的后台服务可通过 PowerShell 运行 `停止研习室.ps1` 关闭。
+命令行启动时用 Ctrl+C 关闭；一键启动的后台服务可双击 `停止研习室.cmd` 或通过 PowerShell 运行 `停止研习室.ps1` 关闭。
 引擎只在有棋盘页面连接时运行。关闭所有棋盘页面后，引擎进程会自动退出。
 
 ## 建议的练习顺序
@@ -110,6 +126,14 @@ Node.js 18+。运行 `npm.cmd ci --omit=dev` 安装网页服务依赖，不需�
 运行 `npm.cmd test` 检验走法、导入、评分方向、走法事实、课程主线与炮线安全、思考停点与恢复、错题去重与重练返回、真实引擎流式响应、取消旧请求及多页面隔离。引擎集成测试需要先按上文安装皮卡鱼与 NNUE。
 服务仅监听 `127.0.0.1`，不同页面拥有独立引擎进程，最多同时四个棋盘。
 服务器保留“初始局面 + 历史着法”发送给引擎，避免仅用当前 FEN 丢失重复局面历史。
+
+### 构建 Windows 整合包
+
+在 Windows 上运行 `npm.cmd run build:portable`。构建脚本会下载并校验固定版本的官方 Node.js、皮卡鱼发布包和对应源码，仅安装锁文件中的生产依赖，并收集原始许可。下载缓存位于 `.runtime/portable-cache/`，输出 ZIP 与 SHA256 位于 `dist/`；这些目录不会上传到 Git。
+
+运行 `npm.cmd run test:portable -- dist/xiangqi-study-v1.2.0-windows-x64.zip` 对实际 ZIP 重新解压验收：移除 PATH 中的 Node/npm，注入无效外部引擎配置，测试包含中文、空格和 `&` 的目录、端口避让、重复启动、真实引擎搜索、停止子进程和缺失文件提示。此测试使用系统 Windows PowerShell 5.1。
+
+目前通过本机上述隔离运行测试与浏览器训练验收；尚未在独立全新 Windows 虚拟机或所有 Windows 硬件上实测。
 
 本机 `engine/` 放置：
 

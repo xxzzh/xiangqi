@@ -1,13 +1,15 @@
 {
   "name": "xiangqi",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Chinese Chess with Pikafish AI Engine",
   "main": "main.js",
   "scripts": {
     "start": "node server.js",
     "electron": "electron .",
     "build": "electron-builder --mac",
-    "test": "node --test --test-concurrency=1 tests/*.test.js"
+    "test": "node --test --test-concurrency=1 tests/*.test.js",
+    "build:portable": "node scripts/build-portable.cjs",
+    "test:portable": "node scripts/smoke-portable.cjs"
   },
   "keywords": [
     "xiangqi",
