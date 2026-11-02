@@ -65,7 +65,8 @@ async function main(){
   const manifest={app:'xiangqi-study',version,platform:'win32-x64',sourceCommit:dirty?null:run('git',['rev-parse','HEAD']).toString().trim(),nodeVersion:sources.node.version,engineVersion:sources.engine.version,sources,files:{}};
   for(const file of files(app))manifest.files[path.relative(app,file).replaceAll('\\','/')]=hash(file);
   fs.writeFileSync(path.join(app,'portable.json'),JSON.stringify(manifest,null,2)+'\n');
-  run(tar,['-a','-cf',output,'-C',build,name]);
+  // Without hdrcharset, Windows tar may write local-codepage names that other ZIP readers misdecode.
+  run(tar,['-a','--options=zip:hdrcharset=UTF-8','-cf',output,'-C',build,name]);
   const digest=hash(output);
   fs.writeFileSync(output+'.sha256',`${digest}  ${path.basename(output)}\n`);
   fs.writeFileSync(path.join(cache,'last-build.json'),JSON.stringify({app,output,version,sha256:digest,bytes:fs.statSync(output).size},null,2));

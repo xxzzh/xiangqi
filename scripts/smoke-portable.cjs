@@ -14,11 +14,11 @@ async function expectFailure(command,pattern){try{await ps(command);assert.fail(
 async function main(){
   assert(process.platform==='win32'&&fs.existsSync(archive),'Pass a Windows portable ZIP path.');
   const extract=path.join(root,'dist',`验收 空格 & 符号 ${Date.now()}`);fs.mkdirSync(extract,{recursive:true});
-  await exec(path.join(system,'tar.exe'),['-xf',archive,'-C',extract],{windowsHide:true});
+  await ps(`Expand-Archive -LiteralPath ${quote(archive)} -DestinationPath ${quote(extract)} -Force`);
   const names=fs.readdirSync(extract);assert.equal(names.length,1);app=path.join(extract,names[0]);
   const manifest=readJson(path.join(app,'portable.json'));
   for(const [relative,digest] of Object.entries(manifest.files))assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(app,relative))).digest('hex'),digest,relative);
-  note('all package file SHA256 values match');
+  note('Windows ZIP extraction preserves Chinese filenames and all file SHA256 values match');
   foreign=http.createServer((req,res)=>{res.setHeader('Content-Type','application/json');res.end(JSON.stringify({app:'xiangqi-study',instanceId:'another-directory',ok:true}));});
   await new Promise(resolve=>foreign.listen(0,'127.0.0.1',resolve));const port=foreign.address().port;assert(port<=65525);
   session=await start(port);assert.notEqual(session.port,port);
